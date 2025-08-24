@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and profile
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  password         String
+  name             String?
+  image            String?
+  planType         String    @default("FREE")
+  subscriptionId   String?
+  customerId       String?   @unique
+  creditsRemaining Int       @default(5000)
+  monthlyCredits   Int       @default(5000)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  projects         Project[]
+  aiUsage          AIUsage[]
+  templates        Template[]
+  subscription     Subscription?
+  sessions         Session[]
+}
+
+// Session model for NextAuth
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Project model for books/manuscripts
+model Project {
+  id            String        @id @default(cuid())
+  userId        String
+  title         String
+  genre         String
+  description   String?
+  wordGoal      Int           @default(50000)
+  currentWords  Int           @default(0)
+  status        String        @default("PLANNING")
+  templateId    String?
+  coverImage    String?
+  deadline      DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template      Template?     @relation(fields: [templateId], references: [id])
+  chapters      Chapter[]
+  characters    Character[]
+  notes         Note[]
+  
+  @@index([userId])
+}
+
+// Chapter model for organizing content
+model Chapter {
+  id          String   @id @default(cuid())
+  projectId   String
+  title       String
+  content     String
+  wordCount   Int      @default(0)
+  orderIndex  Int
+  synopsis    String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+  @@unique([projectId, orderIndex])
+}
+
+// Character model for character development
+model Character {
+  id           String   @id @default(cuid())
+  projectId    String
+  name         String
+  role         String
+  description  String
+  appearance   String?
+  personality  String?
+  background   String?
+  motivations  String?
+  fears        String?
+  mannerisms   String?
+  relationships String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+}
+
+// Note model for project notes
+model Note {
+  id        String   @id @default(cuid())
+  projectId String
+  title     String
+  content   String
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+}
+
+// Template model for story structures
+model Template {
+  id          String   @id @default(cuid())
+  name        String
+  genre       String
+  description String?
+  structure   String
+  isPublic    Boolean  @default(false)
+  creatorId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  creator     User?    @relation(fields: [creatorId], references: [id])
+  projects    Project[]
+  
+  @@index([genre])
+}
+
+// AI Usage tracking for billing
+model AIUsage {
+  id         String   @id @default(cuid())
+  userId     String
+  tool       String
+  prompt     String
+  response   String
+  tokensUsed Int
+  cost       Float    @default(0)
+  createdAt  DateTime @default(now())
+  
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, createdAt])
+}
+
+// Subscription model for Stripe integration
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  stripeCustomerId   String   @unique
+  stripePriceId      String
+  stripeStatus       String
+  stripePeriodEnd    DateTime
+  trialEnd           DateTime?
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  // Relations
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
